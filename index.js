@@ -11,7 +11,7 @@ app.use(cors())
 
 
 // mongo db file  
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.zgnatwl.mongodb.net/?appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -39,16 +39,37 @@ async function run() {
       if(email){
         query.senderEmail=email
       }
-      const curs = percelSellCollcetion.find(query)
+      const options = {sort: {createAt: -1}}
+      const curs = percelSellCollcetion.find(query, options)
       const result = await curs.toArray()
         res.send(result)
     } )
+
+    // singel data get
+    app.get("/percel/:id", async(req, res)=>{
+      const id = req.params.id;
+      const query = { _id : new ObjectId(id)}
+      const result = await  percelSellCollcetion.findOne(query)
+      res.send(result)
+    })
     app.post('/percel', async (req, res)=>{
         const percel =req.body;
+        percel.createAt= new Date ()
+        // sort 
+        
         const result = await percelSellCollcetion.insertOne(percel)
         res.send(result)
         // console.log(result);
     } )
+
+    //
+    app.delete('/percel/:id', async(req,res)=>{
+      const id = req.params.id
+      const query= {_id : new ObjectId(id)}
+      const result = await percelSellCollcetion.deleteOne(query)
+      // console.log(id);
+      res.send(result)
+    })
 
 
 
