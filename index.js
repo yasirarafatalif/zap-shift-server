@@ -26,6 +26,10 @@ const client = new MongoClient(uri, {
   }
 });
 
+function generateTrackingId() {
+  return Date.now(); 
+}
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -34,6 +38,7 @@ async function run() {
 
     const db = client.db("zap-shift")
     const percelSellCollcetion = db.collection("percel-Sell")
+    const paymentCollection = db.collection('payment-success')
 
     // all card show
     app.get('/all-percel', async ( req, res)=>{
@@ -84,9 +89,7 @@ async function run() {
     // payment section
     app.post('/create-checkout-session', async (req, res) => {
       const paymentInfo = req.body;
-      console.log(paymentInfo);
       const amount = parseInt(paymentInfo?.cost) * 100
-      console.log(amount);
       const session = await stripe.checkout.sessions.create({
         line_items: [
           {
@@ -104,15 +107,81 @@ async function run() {
         customer_email: paymentInfo?.senderEmail,
         mode: 'payment',
         metadata: {
-          percelId: paymentInfo.percelId
+          percelId: paymentInfo.percelId,
+          percelName: paymentInfo.percelName
         },
-        success_url: `${process.env.MY_DOMAIN}dashboard/payment-success`,
-        cancel_url: `${process.env.MY_DOMAIN}dashboard/payment-canceled`,
+        success_url: `${process.env.MY_DOMAIN}dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.MY_DOMAIN}dashboard/payment-canceled?session_id={CHECKOUT_SESSION_ID}`,
       });
-      
-
-      // console.log(session);
       res.send({ url: session.url })
+    })
+    // payment success check 
+    app.patch('/verify-payment-success', async(req, res)=>{
+      const sessionId= req.query.session_id;
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      // console.log(session);
+      const trackingId= generateTrackingId()
+      const transtionId= session.payment_intent;
+      const query={transtionId: transtionId};
+      const paymentExits =await paymentCollection.findOne(query)
+      if(paymentExits){
+        return res.send({massege:"alreday payment " , transtionId })
+      }
+  //  console.log('after session', session);
+      if(session.payment_status== 'paid'){
+        const id = session.metadata.percelId;
+        // console.log(id);
+        
+        const query ={ _id: new ObjectId(id)};
+        const update ={
+          $set:{
+            payment_status:'paid',
+            trackingId: trackingId
+          }
+        }  
+        const result =await percelSellCollcetion.updateOne({ _id: new ObjectId(id)},update)
+        // console.log(result);
+       
+        const  verifyPaymentInfo={
+          amount: session.amount_total/100,
+          currency: session.currency,
+          customer_email: session.customer_email,
+          percelId : session.metadata.percelId,
+          percelName: session.metadata.percelName,
+          transtionId: transtionId,
+          trackingId: trackingId,
+          payment_status: session.payment_status,
+          paidAt: new Date(),
+          
+          
+        }
+        console.log(verifyPaymentInfo);
+        if(session.payment_status=='paid'){
+          const result = await paymentCollection.insertOne(verifyPaymentInfo)
+          res.send({success:true,trackingId: trackingId, transtionId: transtionId, })
+          
+        }
+        res.send(result)
+        
+      }
+    
+      res.send({success: true})
+      // res.send(result)
+
+    })
+
+    // payments related api
+    app.get('/payment', async (req, res)=>{
+      const email = req.query.email;
+      const query={}
+      if(email){
+        query.customer_email= email;
+        
+      }
+      // const cours =  paymentCollection.findOne(query)
+      // const result = await cours.toArray()
+      const result = await paymentCollection.find(query).toArray();
+      res.send(result)
     })
 
 
