@@ -30,6 +30,38 @@ function generateTrackingId() {
   return Date.now(); 
 }
 
+// midelware 
+const verifyFbToken= async (req, res, next)=>{
+  const token = req.headers.authorization;
+  // console.log(token);
+  if(!token){
+    return res.status(401).send({message: "Unauthoraize User"})
+  }
+  try {
+    const idToken =  token.split(' ')[1];
+    const decode = await admin.auth().verifyIdToken(idToken);
+    // console.log('object', decode);
+    req.decode_email = decode.email;
+    next()
+    
+  } catch (error) {
+    return res.status(401).send({message: "unthorize email"})
+    
+  }
+ 
+}
+
+
+
+const  admin = require("firebase-admin");
+
+const  serviceAccount = require("./projects-1-full-satck-firebase-adminsdk.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -37,8 +69,45 @@ async function run() {
 
 
     const db = client.db("zap-shift")
-    const percelSellCollcetion = db.collection("percel-Sell")
-    const paymentCollection = db.collection('payment-success')
+    const percelSellCollcetion = db.collection("percel-Sell");
+    const paymentCollection = db.collection('payment-success');
+    const userCollection = db.collection('normal-user');
+    const ridersCollection = db.collection('riders');
+
+    // user related api
+    app.post('/users', async (req,res)=>{
+      const user = req.body
+      user.role ='user'
+      const email = user.email
+      const userExits = await userCollection.findOne({email})
+      if(userExits){
+        return res.send({massege: "user alreday added"})
+      }
+      const result = await userCollection.insertOne(user);
+      res.send(result)
+    })
+
+    //riders related api
+    app.post('/riders', async(req,res)=>{
+      const info =req.body;
+      info.status= 'pending'
+      info.createAt= new Date();
+      const result= await ridersCollection.insertOne(info)
+      // console.log(info)
+      res.send(result)
+    })
+
+    app.get('/riders', async (req,res)=>{
+      const query ={}
+      if(req.query.status){
+        query.status= req.query.status
+
+      }
+      const cours = ridersCollection.find(query)
+      const result = await cours.toArray()
+      res.send(result)
+    })
+
 
     // all card show
     app.get('/all-percel', async ( req, res)=>{
@@ -71,10 +140,8 @@ async function run() {
       const percel = req.body;
       percel.createAt = new Date()
       // sort 
-
       const result = await percelSellCollcetion.insertOne(percel)
       res.send(result)
-      // console.log(result);
     })
 
     //
@@ -82,7 +149,6 @@ async function run() {
       const id = req.params.id
       const query = { _id: new ObjectId(id) }
       const result = await percelSellCollcetion.deleteOne(query)
-      // console.log(id);
       res.send(result)
     })
 
@@ -130,8 +196,6 @@ async function run() {
   //  console.log('after session', session);
       if(session.payment_status== 'paid'){
         const id = session.metadata.percelId;
-        // console.log(id);
-        
         const query ={ _id: new ObjectId(id)};
         const update ={
           $set:{
@@ -156,7 +220,9 @@ async function run() {
           
         }
         console.log(verifyPaymentInfo);
+        
         if(session.payment_status=='paid'){
+          
           const result = await paymentCollection.insertOne(verifyPaymentInfo)
           res.send({success:true,trackingId: trackingId, transtionId: transtionId, })
           
@@ -171,15 +237,16 @@ async function run() {
     })
 
     // payments related api
-    app.get('/payment', async (req, res)=>{
+    app.get('/payment',verifyFbToken, async (req, res)=>{
       const email = req.query.email;
-      const query={}
+      const query={}  
       if(email){
         query.customer_email= email;
-        
+        if(email !== req.decode_email){
+          console.log(req.decode_email);
+          return res.status(403).send({message:"Authorize email"})
+        }
       }
-      // const cours =  paymentCollection.findOne(query)
-      // const result = await cours.toArray()
       const result = await paymentCollection.find(query).toArray();
       res.send(result)
     })
