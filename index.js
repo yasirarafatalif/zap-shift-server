@@ -107,6 +107,29 @@ async function run() {
       const result = await cours.toArray()
       res.send(result)
     })
+    // rider role model update 
+    app.patch('/riders/:id', async(req, res)=>{
+       const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const status= req.body.status
+      const updateData = {
+        $set: {
+          status: status
+        }
+      }
+      console.log(updateData);
+      const result = await  ridersCollection.updateOne(query,updateData )
+      res.send(result)
+    })
+    
+
+    // rider role rejects api
+       app.delete('/riders/:id', async(req, res)=>{
+       const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await ridersCollection.deleteOne(query)
+      res.send(result)
+    })
 
 
     // all card show
