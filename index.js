@@ -74,6 +74,21 @@ async function run() {
     const userCollection = db.collection('normal-user');
     const ridersCollection = db.collection('riders');
 
+
+    // verify admin 
+    const verifyAdmin = async ( req, res, next)=>{
+      const email = req.decode_email;
+      const query={ email}
+      const user = await userCollection.findOne(query)
+      if( user?.role !== "admin"){
+        return res.status(403).send('forbiden access')
+
+      }
+      next()
+      // res.send({success:true})
+
+    }
+
     // user related api
     app.post('/users', async (req,res)=>{
       const user = req.body
@@ -86,6 +101,40 @@ async function run() {
       const result = await userCollection.insertOne(user);
       res.send(result)
     })
+    
+
+    //user get related api
+      app.get('/users', async (req,res)=>{
+      const result = await userCollection.find().toArray()
+      res.send(result)
+    })
+    
+
+    // user role find api
+    app.get('/users/:email/role', verifyFbToken, verifyAdmin, async (req, res)=>{
+      const email = req.params.email
+      const query  ={ email}
+      const user = await userCollection.findOne(query)
+     
+      res.send({role: user?.role ||'user'})
+    })
+    
+
+    // user update releted api
+    app.patch('/users/:id' , async (req, res)=>{
+      const id = req.params.id
+      const roleInfo = req.body;
+      const query = {_id : new ObjectId(id)}
+    const updateData = {
+        $set: {
+          role: roleInfo.role 
+        }
+      }
+      
+     const result = await  userCollection.updateOne(query,updateData )
+      res.send(result)
+    })
+    
 
     //riders related api
     app.post('/riders', async(req,res)=>{
@@ -117,7 +166,6 @@ async function run() {
           status: status
         }
       }
-      console.log(updateData);
       const result = await  ridersCollection.updateOne(query,updateData )
       res.send(result)
     })
