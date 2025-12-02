@@ -147,23 +147,36 @@ async function run() {
     })
 
     app.get('/riders', async (req,res)=>{
+      const { district,workStatus}= req.query
       const query ={}
       if(req.query.status){
         query.status= req.query.status
 
       }
+      if(district){
+        query.district = district
+      }
+      if(workStatus){
+        query.workStatus= workStatus
+      }
+      // console.log(query);
       const cours = ridersCollection.find(query)
       const result = await cours.toArray()
+      // console.log(result);
       res.send(result)
     })
     // rider role model update 
     app.patch('/riders/:id', async(req, res)=>{
-       const id = req.params.id
+      const id = req.params.id
+      
       const query = { _id: new ObjectId(id) }
       const status= req.body.status
+      
+      const workStatus= req.body.worKStatus
       const updateData = {
         $set: {
-          status: status
+          status: status,
+          workStatus: workStatus
         }
       }
       const result = await  ridersCollection.updateOne(query,updateData )
@@ -190,10 +203,15 @@ async function run() {
     // percel sell api
     app.get('/percel', async (req, res) => {
       const query = {}
-      const { email } = req.query;
+      const { email,deliveryStatus } = req.query;
       if (email) {
         query.senderEmail = email
       }
+      if(deliveryStatus){
+        query.deliveryStatus= deliveryStatus
+      }
+      // console.log(deliveryStatus);
+      
       const options = { sort: { createAt: -1 } }
       const curs = percelSellCollcetion.find(query, options)
       const result = await curs.toArray()
@@ -213,6 +231,38 @@ async function run() {
       // sort 
       const result = await percelSellCollcetion.insertOne(percel)
       res.send(result)
+    })
+
+    // percel patch api
+    app.patch('/percel/:id',async (req, res)=>{
+      const {percelId, name, email, riderId,phoneNumber} = req.body
+      const id = req.params.id
+      
+      const query = {_id: new ObjectId(id)}
+
+         const update ={
+          $set:{
+            
+          riderId: riderId,
+          deliveryStatus: 'rider-assign',
+          riderName: name,
+          riderPhoneNumber: phoneNumber,
+          riderEmail: email,
+        
+          }
+        } 
+        const result = await percelSellCollcetion.updateOne(query, update)
+        console.log(result);
+        const riderQureey ={ _id: new ObjectId(riderId)}
+        const riderUpdateData ={
+          $set:{
+            workStatus: "in_delivery"
+
+          }
+        }
+        const riderResult = await ridersCollection.updateOne(riderQureey, riderUpdateData)
+      res.send({result, riderResult})
+
     })
 
     //
@@ -271,38 +321,48 @@ async function run() {
         const update ={
           $set:{
             payment_status:'paid',
-            trackingId: trackingId
-          }
-        }  
-        const result =await percelSellCollcetion.updateOne({ _id: new ObjectId(id)},update)
-        // console.log(result);
-       
-        const  verifyPaymentInfo={
+            trackingId: trackingId,
+          deliveryStatus: 'pending-pickup',
           amount: session.amount_total/100,
           currency: session.currency,
-          customer_email: session.customer_email,
           percelId : session.metadata.percelId,
-          percelName: session.metadata.percelName,
           transtionId: transtionId,
           trackingId: trackingId,
           payment_status: session.payment_status,
           paidAt: new Date(),
+          }
+        }  
+        const result =await percelSellCollcetion.updateOne({ _id: new ObjectId(id)},update)
+        console.log(result);
+        // console.log(result);
+       
+        // const  verifyPaymentInfo={
+        //   deliveryStatus: 'pending-pickup',
+        //   amount: session.amount_total/100,
+        //   currency: session.currency,
+        //   customer_email: session.customer_email,
+        //   percelId : session.metadata.percelId,
+        //   percelName: session.metadata.percelName,
+        //   transtionId: transtionId,
+        //   trackingId: trackingId,
+        //   payment_status: session.payment_status,
+        //   paidAt: new Date(),
           
           
-        }
-        console.log(verifyPaymentInfo);
+        // }
+        // console.log(verifyPaymentInfo);
         
-        if(session.payment_status=='paid'){
+        // if(session.payment_status=='paid'){
           
-          const result = await paymentCollection.insertOne(verifyPaymentInfo)
-          res.send({success:true,trackingId: trackingId, transtionId: transtionId, })
+        //   const result = await paymentCollection.insertOne(verifyPaymentInfo)
+        //   res.send({success:true,trackingId: trackingId, transtionId: transtionId, })
           
-        }
+        // }
         res.send(result)
         
       }
     
-      res.send({success: true})
+      // res.send({success: true})
       // res.send(result)
 
     })
@@ -310,15 +370,18 @@ async function run() {
     // payments related api
     app.get('/payment',verifyFbToken, async (req, res)=>{
       const email = req.query.email;
-      const query={}  
+      // console.log(email);
+      const query={payment_status:"paid"}  
       if(email){
-        query.customer_email= email;
+        query.senderEmail= email;
         if(email !== req.decode_email){
           console.log(req.decode_email);
           return res.status(403).send({message:"Authorize email"})
         }
       }
-      const result = await paymentCollection.find(query).toArray();
+      
+      
+      const result = await percelSellCollcetion.find(query).toArray();
       res.send(result)
     })
 
