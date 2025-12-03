@@ -99,6 +99,7 @@ async function run() {
         return res.send({massege: "user alreday added"})
       }
       const result = await userCollection.insertOne(user);
+      console.log(result);
       res.send(result)
     })
     
@@ -111,7 +112,7 @@ async function run() {
     
 
     // user role find api
-    app.get('/users/:email/role', verifyFbToken, verifyAdmin, async (req, res)=>{
+    app.get('/users/:email/role', verifyFbToken,  async (req, res)=>{
       const email = req.params.email
       const query  ={ email}
       const user = await userCollection.findOne(query)
@@ -168,10 +169,9 @@ async function run() {
     // rider role model update 
     app.patch('/riders/:id', async(req, res)=>{
       const id = req.params.id
-      
+      const email = req.body.email
       const query = { _id: new ObjectId(id) }
       const status= req.body.status
-      
       const workStatus= req.body.worKStatus
       const updateData = {
         $set: {
@@ -179,8 +179,23 @@ async function run() {
           workStatus: workStatus
         }
       }
+      const userQuery = { email: email };
+       const riderUpdate = {
+        $set: {
+          role: 'rider'
+        }
+      }
+      // console.log(updatRole);
+      const roleUpdate= await userCollection.updateOne(userQuery,riderUpdate)
+      console.log(roleUpdate);
       const result = await  ridersCollection.updateOne(query,updateData )
-      res.send(result)
+      // console.log(result);
+        res.send({
+            success: true,
+            userRoleUpdated: roleUpdate,
+            riderUpdated: riderUpdate
+        });
+
     })
     
 
@@ -216,6 +231,26 @@ async function run() {
       const curs = percelSellCollcetion.find(query, options)
       const result = await curs.toArray()
       res.send(result)
+    })
+
+
+    app.get('/percel/rider' , async (req, res)=>{
+      const {riderEmail, deliveryStatus} = req.query;
+      const query ={}
+      // if(riderEmail){
+      //   query.riderEmail = riderEmail
+
+      // }
+      if(deliveryStatus){
+        query.deliveryStatus= deliveryStatus
+      }
+      console.log(deliveryStatus);
+
+      const cours = percelSellCollcetion.find(query)
+      const result = await cours.toArray()
+      console.log(result);
+      res.send(result)
+     
     })
 
     // singel data get
