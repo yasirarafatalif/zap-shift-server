@@ -237,8 +237,16 @@ async function run() {
     app.get('/percel/rider', async (req, res) => {
       const { riderEmail, deliveryStatus } = req.query;
       const query = {}
+      if(riderEmail){
+        query.riderEmail= riderEmail
+      }
       if (deliveryStatus) {
-        query.deliveryStatus = { $in: ['rider-assign', 'rider_arriving', 'percel_pickup'] }
+        query.deliveryStatus = {
+          
+          // $in: ['rider-assign', 'rider_arriving', 'percel-pickup']
+          // $nin: ['rider-assign', 'rider_arriving', 'percel_pickup']
+          $nin: ['parcel-delivered']
+         }
       }
       const cours = percelSellCollcetion.find(query)
       const result = await cours.toArray()
@@ -262,101 +270,58 @@ async function run() {
     })
 
     // percel patch api
-    // app.patch('/percel/:id', async (req, res) => {
-    //   const {  name, email, riderId, phoneNumber } = req.body
-    //   const id = req.params.id
 
-    //   const query = { _id: new ObjectId(id) }
-    //   const updateData = {
-    //     $set: {
-    //       riderId: riderId,
-    //       deliveryStatus: 'rider-assign',
-    //       riderName: name,
-    //       riderPhoneNumber: phoneNumber,
-    //       riderEmail: email,
-    //     }
-    //   }
-    //   console.log(updateData);
+    // kisu jinis kora baki ache
+    app.patch('/percel/:id', async (req, res) => {
+      const {  name, email, riderId, phoneNumber } = req.body
+      const id = req.params.id
 
-    //   const result = await percelSellCollcetion.updateOne(query, updateData)
+      const query = { _id: new ObjectId(id) }
+      const updateData = {
+        $set: {
+          riderId: riderId,
+          deliveryStatus: 'rider-assign',
+          riderName: name,
+          riderPhoneNumber: phoneNumber,
+          riderEmail: email,
+        }
+      }
+      console.log(updateData);
 
-    //   const riderQureey = { _id: new ObjectId(riderId) }
+      const parcelResult = await percelSellCollcetion.updateOne(query, updateData)
+      console.log(parcelResult);
 
-    //   const riderUpdateData = {
-    //     $set: {
-    //       workStatus: "in_delivery"
+      const riderQureey = { _id: new ObjectId(riderId) }
 
-    //     }
-    //   }
+      const riderUpdateData = {
+        $set: {
+          workStatus: "in_delivery"
 
-    //   const rider = await ridersCollection.findOne(riderQureey)
+        }
+      }
+
+      // const rider = await ridersCollection.findOne(riderQureey)
 
     //   if (rider.workStatus !== "available") {
     //     return res.status(400).send({ message: "Rider not available" })
     //   }
-    //   const riderResult = await ridersCollection.updateOne(riderQureey, riderUpdateData)
-    //   res.send(result)
+      const riderResult = await ridersCollection.updateOne(riderQureey, riderUpdateData)
+      console.log(riderResult);
+    //  res.send({
+    //     success: true,
+    //     parcelUpdate: parcelResult,
+    //     riderUpdate: riderResult
+    //   });
+    res.send({
+      parcelResult,
+      riderResult
+    })
 
-    // })
+    })
 
 
     // percel patch api
-    app.patch('/percel/:id', async (req, res) => {
-      try {
-        const { name, email, riderId, phoneNumber } = req.body;
-        const id = req.params.id;
-
-        const parcelQuery = { _id: new ObjectId(id) };
-        const riderQuery = { _id: new ObjectId(riderId) };
-
-        // find rider
-        const rider = await ridersCollection.findOne(riderQuery);
-
-        if (!rider) {
-          return res.status(404).send({ message: "Rider not found" });
-        }
-
-        // find rider to workstatus
-        if (rider.workStatus !== "available") {
-          return res.status(400).send({ message: "Rider not available" });
-        }
-
-        //  Parcel Update Data 
-        const parcelUpdateData = {
-          $set: {
-            riderId: riderId,
-            deliveryStatus: "rider-assign",
-            riderName: name,
-            riderPhoneNumber: phoneNumber,
-            riderEmail: email,
-          }
-        };
-
-        //  Rider workStatus update
-        const riderUpdateData = {
-          $set: {
-            workStatus: "in_delivery"
-          }
-        };
-
-        //  Parcel Update 
-        const parcelResult = await percelSellCollcetion.updateOne(parcelQuery, parcelUpdateData);
-
-        //  Rider Update
-        const riderResult = await ridersCollection.updateOne(riderQuery, riderUpdateData);
-
-        // ---- Step 7: Final Response ----
-        res.send({
-          success: true,
-          parcelUpdate: parcelResult,
-          riderUpdate: riderResult
-        });
-
-      } catch (error) {
-        res.status(500).send({ message: "Server error", error: error.message });
-      }
-    });
-
+ 
 
     //Delivery  status update api
     app.patch('/percel/:id/status', async (req, res) => {
